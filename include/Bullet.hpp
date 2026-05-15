@@ -71,20 +71,33 @@ class Bullet: public Entity {
       return {pos_x, pos_y, width, height};
     }
 
-    void on_collision(std::shared_ptr<Entity> other) override {
+    bool on_collision(std::shared_ptr<Entity> other) override {
       //if (other == owner) return;
       auto type = other->get_type();
       
       switch (type) {
         case CollidableType::HARPOON: 
         case CollidableType::BULLET:          
-        case CollidableType::WALL:
         case CollidableType::TANK:
+        case CollidableType::BOT:
+        case CollidableType::WALL: {
           mark_exploding();
+          break;
+        }
+
+        case CollidableType::SHIELD: {
+          if (owner_->get_type() == CollidableType::BOT) {
+            mark_exploding();
+          }
+
+          else return true; // returning true in case we don't have actual collision
+        }
             
         default:  
           break;
       }
+
+      return false;
     }
 
     void update() override {

@@ -16,9 +16,11 @@ enum Direction {
 };
 
 enum class CollidableType {
+  BOT,
   TANK,
   BULLET,
-  WALL, 
+  WALL,
+  SHIELD, 
   HARPOON,
   NONE
 };
@@ -111,7 +113,7 @@ class Entity {
 
   virtual std::shared_ptr<Entity> get_owner() const { return std::shared_ptr<Entity>(); }
   virtual Rect get_collision_rect() const = 0;
-  virtual void on_collision(std::shared_ptr<Entity> other) = 0; 
+  virtual bool on_collision(std::shared_ptr<Entity> other) = 0; 
   virtual bool is_active() const = 0; 
   virtual void update() = 0;
   virtual CollidableType get_type() const = 0;
@@ -119,13 +121,14 @@ class Entity {
 
 class MapWallEntity : public Entity {
 public:
-    MapWallEntity() : Entity(0, 0, TILE_SIZE, TILE_SIZE) {}
+    CollidableType type_ = CollidableType::WALL;
+    MapWallEntity(CollidableType type) : Entity(0, 0, TILE_SIZE, TILE_SIZE), type_(type) {}
     void draw() override {} 
     void update() override {}
     bool is_active() const override { return true; }
-    CollidableType get_type() const override { return CollidableType::WALL; }
+    CollidableType get_type() const override { return type_; }
     Rect get_collision_rect() const override { return {0,0,0,0}; } // Не используется
-    void on_collision(std::shared_ptr<Entity> other) override {} 
+    bool on_collision(std::shared_ptr<Entity> other) override {return false;} 
 };
 
 #endif

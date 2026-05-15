@@ -3,6 +3,13 @@
 #include <algorithm>
 #include "Entity.hpp"
 
+struct Tile {
+    CollidableType type; 
+    int x; 
+    int y;
+    Tile(CollidableType t, int px, int py) : type(t), x(px), y(py) {}
+};
+
 class CollisionManager {
     uint8_t (*game_map)[MAP_WIDTH];
     std::vector<std::weak_ptr<Entity>> objects_;
@@ -44,10 +51,14 @@ public:
             }
         }
 
-        if (check_map_collision(future_rect, mover->get_type())) {
-            auto tmp = std::make_shared<MapWallEntity>();
-            mover->on_collision(tmp);
-            has_collision = true;
+        auto collision = check_map_collision(future_rect, mover->get_type());
+        if (collision.has_value()) {
+            auto tmp = std::make_shared<MapWallEntity>(collision->type);
+            if (mover->on_collision(tmp)) {
+                return false;
+            }
+
+            else {has_collision = true;}            
         }
 
         return has_collision;
@@ -64,19 +75,24 @@ public:
         );
     }
 
-    bool check_map_collision(Rect rect, CollidableType type) {
+    std::optional<Tile> check_map_collision(Rect rect, CollidableType type) {
         int start_col = rect.x / TILE_SIZE;
         int end_col   = (rect.x + rect.w - 1) / TILE_SIZE;
         int start_row = rect.y / TILE_SIZE;
         int end_row   = (rect.y + rect.h - 1) / TILE_SIZE;
 
         if (start_col < 0 || end_col >= MAP_WIDTH || start_row < 0 || end_row >= MAP_HEIGHT) {
-            return true; 
+           return std::optional<Tile>(Tile(CollidableType::NONE, 0, 0));
         }
 
         for (int i = start_row; i <= end_row; i++) {
             for (int j = start_col; j <= end_col; j++) {
                 switch(game_map[i][j]) {
+                    case SHIELD:
+                    case SHIELD_ON_BEDROCK:
+                    case SHIELD_ON_GRASS:
+                    case SHIELD_ON_BRICK:
+                        return std::optional<Tile>(Tile{CollidableType::SHIELD, i, j}); 
                     case BRICKS_WALL: {
                         if (type == CollidableType::BULLET) {
                             game_map[i][j] = BLACK;
@@ -85,10 +101,10 @@ public:
                             }
                         }
                         
-                        return true; 
+                        return std::optional<Tile>(Tile{CollidableType::WALL, i, j}); 
                     }
 
-                    case BEDROCK: return true;
+                    case BEDROCK: return std::optional<Tile>(Tile{CollidableType::WALL, i, j}); ;
                     case SPECIAL: {
                         if (type == CollidableType::BULLET) {
                             game_map[i][j] = BLACK;
@@ -98,12 +114,12 @@ public:
                             }
                         }
                         
-                        return true;
+                        return std::optional<Tile>(Tile{CollidableType::WALL, i, j}); 
                     }
                 }
             }
         }
-        return false;
+        return std::nullopt;
     }
 
     std::vector<Direction> get_valid_directions(int speed, Rect current_rect) {

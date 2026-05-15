@@ -66,6 +66,10 @@ public:
         get_valid_dir_callback_ = std::move(callback);
     }
 
+    CollidableType get_type() const override {
+      return CollidableType::BOT;
+    }
+
     void shoot() {
         fired_ = true;
         on_shot_fired();

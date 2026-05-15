@@ -17,6 +17,11 @@ enum TILE_TYPE {
     SPECIAL     = 4,
     SPAWN_POINTS= 5,
     SPAWN_P1    = 6,
+    SHIELD      = 7, //default sheild
+    SHIELD_ON_GRASS   = 8,
+    SHIELD_ON_BEDROCK = 9,
+    SHIELD_ON_BRICK   = 10,
+    OUB = 11, //out of bounds
 };
 
 struct spawnPlace {

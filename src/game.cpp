@@ -123,6 +123,13 @@ void Game::execute_updates() {
     } 
   }
 
+  if (buttons_[BTN_B].status_) {
+    if (tanks_[0]->is_shield_able_to_put()) { 
+      tanks_[0]->put_shield();
+      put_shield_on_the_map(tanks_[0]->getX(), tanks_[0]->getY());
+    } 
+  }
+
   for (size_t i = 1; i < tanks_.size(); ++i) {
     auto bot = std::static_pointer_cast<BotTank>(tanks_[i]);
     if (bot->fired_) {
@@ -253,7 +260,7 @@ void Game::execute_updates() {
       continue;
     }
     
-    
+
     harpoon->move(harpoon->get_dx(), harpoon->get_dy());
     harpoon->add_distance(DEFAULT_HARPOON_SPEED);
     dirty_rects_set.insert(harpoon->get_collision_rect());
@@ -314,11 +321,8 @@ void Game::create_bot(size_t x_pos, size_t y_pos, BotType type) {
   if (bot->is_valid()) {
     bot->draw(); 
     tanks_.push_back(std::move(bot)); 
-  }
-
-  else return;
-
-  collision_mgr_.register_object(tanks_.back());
+    collision_mgr_.register_object(tanks_.back());
+  }  
 }
 
 void Game::delete_tank(size_t index) {
@@ -357,10 +361,13 @@ std::vector<Rect> Game::draw_map() {
       uint32_t color = 0;
       switch(game_map_[i][j]) {
         case BLACK: break;
-        case GRASS:       color = TFT_OLIVE;   break;
-        case BRICKS_WALL: color = TFT_BROWN;   break;
-        case SPECIAL:     color = TFT_MAGENTA; break;
-        case BEDROCK:     color = TFT_DARKGREY;break;
+        case GRASS:       color = TFT_OLIVE;    break;
+        case BRICKS_WALL: color = TFT_BROWN;    break;
+        case SPECIAL:     color = TFT_MAGENTA;  break;
+        case BEDROCK:     color = TFT_DARKGREY; break;
+        case SHIELD:      color = TFT_WHITE;     break;
+        case SHIELD_ON_BEDROCK: color = TFT_WHITE;break;
+        case SHIELD_ON_BRICK:   color = TFT_WHITE;break;
         case SPAWN_P1: {
           color = TFT_SILVER;
           Rect tank_rect = {j*TILE_SIZE, i*TILE_SIZE, TILE_SIZE, TILE_SIZE};
@@ -389,7 +396,7 @@ void Game::draw_info_table() {
   int frame_x = (MAP_WIDTH - 4) * TILE_SIZE;
   int frame_y = 0;
   int frame_width = 4 * TILE_SIZE;
-  int frame_height = 6 * TILE_SIZE;  // Уменьшаем до 6 строк (убрали AMMO и HP надписи)
+  int frame_height = 8 * TILE_SIZE; 
 
   // Внешняя рамка (объемный эффект)
   tft_.drawRect(frame_x, frame_y, frame_width, frame_height, TFT_WHITE);
@@ -413,6 +420,7 @@ void Game::draw_info_table() {
   // Вместо этого рисуем иконки
   tft_.drawString("X:",    frame_x + 10, frame_y + 78, 1);
   tft_.drawString("Y:",    frame_x + 10, frame_y + 98, 1);
+  tft_.drawString("SH:",   frame_x + 10, frame_y + 118, 1);
 }
 void draw_heart(TFT_eSPI& tft, int x, int y, int size = 10) {
   if (size == 10) {
@@ -439,13 +447,15 @@ void Game::print_tank_data_to_info_table(const Tank& tank, bool force_update) {
   // Если force_update == true, сбрасываем все статические переменные
   if (force_update) {
     last_health_ = -1;
-    last_ammo_ = -1;
+    last_ammo_ = -1;  
     last_x_ = -1;
     last_y_ = -1;
+    last_shield_ammo = -1;
   }
   
   int current_health = tank.get_health();
   int current_ammo   = tank.get_ammunition();
+  int current_shield_ammo = tank.get_shield_ammunition();
   Rect rect          = tank.get_collision_rect();
   int current_x = rect.x;
   int current_y = rect.y;
@@ -522,6 +532,13 @@ void Game::print_tank_data_to_info_table(const Tank& tank, bool force_update) {
     tft_.fillRect(frame_x + 30, frame_y + 98, 30, 16, TFT_BLACK);
     tft_.drawString(String(current_y), frame_x + 30, frame_y + 98, 1);
   }
+
+  if (current_shield_ammo != last_shield_ammo) {
+    last_shield_ammo = current_shield_ammo;
+    
+    tft_.fillRect(frame_x + 30, frame_y + 118, 30, 16, TFT_BLACK);
+    tft_.drawString(String(last_shield_ammo), frame_x + 40, frame_y + 118, 1);
+  }
 }
 
 void Game::draw_map_part(Rect r) {
@@ -559,12 +576,32 @@ void Game::draw_map_part(Rect r) {
   }
 }
 
-uint16_t Game::getBlockColor(int row, int col) {
+uint32_t Game::getBlockColor(int row, int col) {
   switch(game_map_[row][col]) {
     case GRASS:       return TFT_OLIVE;
     case BRICKS_WALL: return TFT_BROWN;
     case SPECIAL:     return TFT_MAGENTA;
     case BEDROCK:     return TFT_DARKGREY;
+    case SHIELD:      return TFT_PINK;
+    case SHIELD_ON_GRASS:   return TFT_DARKGREEN;
+    case SHIELD_ON_BRICK:   return TFT_DISPOFF;
+    case SHIELD_ON_BEDROCK: return TFT_DARKGREY;
+    
+    default:          return TFT_BLACK;
+  }
+}
+
+uint32_t Game::getBlockColor(TILE_TYPE type) {
+  switch(type) {
+    case GRASS:       return TFT_OLIVE;
+    case BRICKS_WALL: return TFT_BROWN;
+    case SPECIAL:     return TFT_MAGENTA;
+    case BEDROCK:     return TFT_DARKGREY;
+    case SHIELD:      return TFT_PINK;
+    case SHIELD_ON_GRASS:   return TFT_DARKGREEN;
+    case SHIELD_ON_BRICK:   return TFT_DISPOFF;
+    case SHIELD_ON_BEDROCK: return TFT_DARKGREY;
+    
     default:          return TFT_BLACK;
   }
 }
@@ -682,7 +719,10 @@ void Game::advance_to_next_level() {
 
   memcpy(game_map_, level_mgr_.get_current_level()->map, sizeof(game_map_));
   spawnPlace place = level_mgr_.get_player_spawn_point();
+  tanks_[0]->set_ammunition(tanks_[0]->get_max_ammunition()); 
   tanks_[0]->setPosition(place.x, place.y);
+  tanks_[0]->set_shield_ammunition();
+  tanks_[0]->inc_health();
   draw_map();
   print_tank_data_to_info_table(*tanks_[0], true);
 }
@@ -701,4 +741,83 @@ bool Game::is_block_free(size_t x, size_t y) {
   return true;
 }
 
-
+void Game::put_shield_on_the_map(int x, int y) {
+  int tank_tile_x = x / TILE_SIZE;
+  int tank_tile_y = y / TILE_SIZE;
+  
+  auto dir = tanks_[0]->getOrientation();
+  
+  int start_x = tank_tile_x;
+  int start_y = tank_tile_y;
+  int end_x = tank_tile_x;
+  int end_y = tank_tile_y;
+  
+  // В зависимости от направления, определяем область для щита
+  switch(dir) {
+    case DIR_UP:
+      // Стена сверху танка (ряд перед танком, 2 клетки в ширину)
+      start_x = tank_tile_x;
+      end_x = tank_tile_x + 1;
+      start_y = tank_tile_y - 1;
+      end_y = tank_tile_y - 1;
+      break;
+      
+    case DIR_DOWN:
+      // Стена снизу танка
+      start_x = tank_tile_x;
+      end_x = tank_tile_x + 1;
+      start_y = tank_tile_y + 2;
+      end_y = tank_tile_y + 2;
+      break;
+      
+    case DIR_LEFT:
+      // Стена слева от танка
+      start_x = tank_tile_x - 1;
+      end_x = tank_tile_x - 1;
+      start_y = tank_tile_y;
+      end_y = tank_tile_y + 1;
+      break;
+      
+    case DIR_RIGHT:
+      // Стена справа от танка
+      start_x = tank_tile_x + 2;
+      end_x = tank_tile_x + 2;
+      start_y = tank_tile_y;
+      end_y = tank_tile_y + 1;
+      break;
+      
+    default:
+      return;
+  }
+  
+  if (start_x < 0 || end_x >= MAP_WIDTH || start_y < 0 || end_y >= MAP_HEIGHT) {
+    return;
+  }
+  
+  for (int i = start_y; i <= end_y; i++) {
+    for (int j = start_x; j <= end_x; j++) {
+      TILE_TYPE new_type = TILE_TYPE::SHIELD;
+      
+      switch(game_map_[i][j]) {
+        case GRASS:       
+          new_type = TILE_TYPE::SHIELD_ON_GRASS;
+          break;
+        case BRICKS_WALL: 
+          new_type = TILE_TYPE::SHIELD_ON_BRICK;
+          break;
+        case BEDROCK:     
+          new_type = TILE_TYPE::SHIELD_ON_BEDROCK;
+          break;
+        default:
+          new_type = TILE_TYPE::SHIELD;
+          break;
+      }
+      
+      game_map_[i][j] = new_type;
+      
+      uint16_t color = getBlockColor(i, j);
+      tft_.fillRect(j * TILE_SIZE, i * TILE_SIZE, 
+                    TILE_SIZE, TILE_SIZE, color);
+    }
+  }
+}

@@ -115,11 +115,11 @@ public:
         return {0, 0};
     }
     
-    void on_collision(std::shared_ptr<Entity> other) override {
-        if (state_ != HarpoonState::FLYING) return;
+    bool on_collision(std::shared_ptr<Entity> other) override {
+        if (state_ != HarpoonState::FLYING) return false;
         
         // Не врезаемся в своего владельца
-        if (other == owner_) return;
+        if (other == owner_) return false;
         
         auto type = other->get_type();
         
@@ -131,6 +131,7 @@ public:
                 state_ = HarpoonState::RETRACTING;
                 break;
                 
+            case CollidableType::BOT:
             case CollidableType::TANK:
                 // Можно зацепиться за вражеский танк
                 attached_x_ = other->getX() + other->getWidth() / 2;
@@ -141,6 +142,8 @@ public:
             default:
                 break;
         }
+
+        return false;
     }
 
     int get_dx() {return dx_;}

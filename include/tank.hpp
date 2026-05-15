@@ -21,6 +21,8 @@ enum class BotType {
   NAB, //not a bot
 };
 
+constexpr int SHIELD_HEALTH = 50;
+
 class Tank : public Entity {
   const size_t max_health_, max_ammunition_; 
   int health_, ammunition_, speed_; 
@@ -49,8 +51,13 @@ class Tank : public Entity {
   // launch stands for harpoon shot
   unsigned long lastLaunchTime = 0;
   unsigned long launchCooldownMs = 1000;
+  unsigned long lastPutWallTime = 0;
+  unsigned long putWalldownMs = 1000;
 
   int reloadCounter_ = 0;
+
+  bool shielding_field = false;
+  int  shield_ammunition_ = 5;
   
   TFT_eSPI& tft_;
 
@@ -86,7 +93,7 @@ class Tank : public Entity {
       Rect current_rect = get_collision_rect();
       Rect next_rect = current_rect;
       int speed = get_speed();
-      
+    
       switch(dir) {
         case Direction::DIR_UP:    
           next_rect.y -= speed; 
@@ -105,7 +112,7 @@ class Tank : public Entity {
       return next_rect;
     }
 
-    void on_collision(std::shared_ptr<Entity> other) override {
+    bool on_collision(std::shared_ptr<Entity> other) override {
       auto type = other->get_type();
       
       switch (type) {
@@ -123,6 +130,8 @@ class Tank : public Entity {
         default:  
           break;
       }
+
+      return false;
     }
 
     CollidableType get_type() const override {
@@ -189,6 +198,33 @@ class Tank : public Entity {
     int    get_ammunition()     const noexcept {return ammunition_;}
     size_t get_max_health()     const noexcept {return max_health_;}
     size_t get_max_ammunition() const noexcept {return max_ammunition_;}
+
+    void put_shield() noexcept { 
+      shield_ammunition_--;
+    }
+
+    int get_shield_ammunition() const noexcept{
+      return shield_ammunition_;
+    }
+
+    void set_shield_ammunition() {
+      shield_ammunition_ = 5;
+    }
+
+    void inc_health() {
+      if (health_ + 10 <= max_health_)
+        health_+=10;
+    }
+
+    bool is_shield_able_to_put() {
+      unsigned long tmp = millis();
+      if (tmp-lastPutWallTime >= putWalldownMs && shield_ammunition_> 0) {
+        lastPutWallTime = tmp;
+        return true; 
+      }
+
+      return false;
+    }
 
     TFT_eSPI& get_tft() const noexcept {return tft_;};
 };

@@ -48,10 +48,12 @@ class Game final {
     int last_ammo_ = -1;
     int last_x_ = -1;
     int last_y_ = -1;
+    int last_shield_ammo = -1;
 
     void move_player(DirtyRectsSet& dirty_rects);
     void move_bots(DirtyRectsSet& dirty_rects);
-    uint16_t getBlockColor(int row, int col);
+    uint32_t getBlockColor(int row, int col);
+    uint32_t getBlockColor(TILE_TYPE type);
 
     public:
         Game(TFT_eSPI& tft) : tft_(tft), level_mgr_(levels, 3), collision_mgr_(nullptr), 
@@ -103,6 +105,7 @@ class Game final {
             last_ammo_ = -1;
             last_x_ = -1;
             last_y_ = -1;
+            last_shield_ammo = -1;
 
             start();
         }
@@ -111,6 +114,7 @@ class Game final {
 
         // function to update the status of buttons, can be used in the main loop to check for button presses
         std::vector<Rect> draw_map();
+        void put_shield_on_the_map(int x, int y); //changing map
         void draw_map_part(Rect r);
         void draw_pause_screen();
         void draw_info_table();
