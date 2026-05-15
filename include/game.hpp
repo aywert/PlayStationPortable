@@ -97,6 +97,13 @@ class Game final {
         
             level_mgr_.restart();
             memcpy(game_map_, level_mgr_.get_current_level()->map, sizeof(game_map_));
+
+            //updating static variables in order to let info table work correctly
+            last_health_ = -1;
+            last_ammo_ = -1;
+            last_x_ = -1;
+            last_y_ = -1;
+
             start();
         }
 
